@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+﻿import { createClient } from "@supabase/supabase-js";
 
 (function () {
   const STORAGE_KEY = "project-looper-mvp";
@@ -79,6 +79,99 @@ import { createClient } from "@supabase/supabase-js";
       { authorName: "Leo Santos", content: "If you're building something cross-discipline, post the clearest possible goal first. It really helps the right people show up.", createdAt: "2026-04-06T22:05:00.000Z" },
     ],
   };
+  function createMarketingCover(label, startColor, endColor) {
+    return `data:image/svg+xml;utf8,${encodeURIComponent(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900">
+        <defs>
+          <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="${startColor}" />
+            <stop offset="100%" stop-color="${endColor}" />
+          </linearGradient>
+        </defs>
+        <rect width="1200" height="900" fill="url(#bg)" />
+        <circle cx="210" cy="180" r="120" fill="rgba(255,255,255,0.18)" />
+        <circle cx="1000" cy="690" r="180" fill="rgba(255,255,255,0.12)" />
+        <rect x="110" y="620" width="980" height="120" rx="32" fill="rgba(255,255,255,0.16)" />
+        <text x="110" y="485" fill="white" font-size="84" font-family="Segoe UI, Arial, sans-serif" font-weight="700">${label}</text>
+      </svg>
+    `)}`;
+  }
+  const LANDING_PREVIEW_PROJECTS = [
+    {
+      id: "landing-preview-design",
+      ownerId: "landing-owner-jordan",
+      ownerName: "Jordan Rivera",
+      title: "Open Studio Poster Set",
+      description: "A collaborative poster series for people who love expressive layout, typography, and visual worldbuilding.",
+      category: "design",
+      categoryLabel: "Design / Art",
+      categoryIcon: CATEGORY_CONFIG.design.icon,
+      skillsNeeded: ["Illustration", "Art Direction", "Layout Design"],
+      status: "open",
+      teamSizeMode: "fixed",
+      teamSizeValue: 3,
+      durationType: "fixed",
+      durationValue: "3 weeks",
+      createdAt: "2026-04-24T16:00:00.000Z",
+      previewMembers: [{ name: "Jordan Rivera" }],
+      previewMemberCount: 1,
+    },
+    {
+      id: "landing-preview-dev",
+      ownerId: "landing-owner-avery",
+      ownerName: "Avery Chen",
+      title: "Pixel Dungeon Build Tracker",
+      description: "A playful retro-flavored tool for tracking rooms, loot, and enemy stats in a shared game prototype.",
+      category: "dev",
+      categoryLabel: "Dev / Coding",
+      categoryIcon: CATEGORY_CONFIG.dev.icon,
+      skillsNeeded: ["Frontend", "JavaScript", "Game UI"],
+      status: "active",
+      teamSizeMode: "fixed",
+      teamSizeValue: 4,
+      durationType: "fixed",
+      durationValue: "6 weeks",
+      createdAt: "2026-04-23T18:30:00.000Z",
+      previewMembers: [{ name: "Avery Chen" }, { name: "Leo Santos" }],
+      previewMemberCount: 2,
+    },
+    {
+      id: "landing-preview-writing",
+      ownerId: "landing-owner-samira",
+      ownerName: "Samira Hale",
+      title: "Creator Stories Editorial Pack",
+      description: "A short-form writing collaboration for interviews, profiles, and clean editorial storytelling.",
+      category: "writing",
+      categoryLabel: "Writing / Content",
+      categoryIcon: CATEGORY_CONFIG.writing.icon,
+      skillsNeeded: ["Writing", "Editing", "Interviewing"],
+      status: "open",
+      teamSizeMode: "fixed",
+      teamSizeValue: 4,
+      durationType: "fixed",
+      durationValue: "4 weeks",
+      createdAt: "2026-04-22T15:15:00.000Z",
+      previewMembers: [{ name: "Samira Hale" }],
+      previewMemberCount: 1,
+    },
+  ];
+  const LANDING_SHOWCASE_PROJECTS = [
+    {
+      id: "landing-showcase-neon",
+      title: "Neon Alley Poster Series",
+      coverImage: createMarketingCover("Neon Alley Poster Series", "#1f2e73", "#ff7a45"),
+    },
+    {
+      id: "landing-showcase-zine",
+      title: "Digital Zine Jam",
+      coverImage: createMarketingCover("Digital Zine Jam", "#6f44d9", "#1c7ed6"),
+    },
+    {
+      id: "landing-showcase-press-kit",
+      title: "Press Kit Builder",
+      coverImage: createMarketingCover("Press Kit Builder", "#0f766e", "#22c55e"),
+    },
+  ];
 
   const appState = {
     db: loadDatabase(),
@@ -2526,20 +2619,36 @@ import { createClient } from "@supabase/supabase-js";
   }
 
   function projectMemberCount(projectId) {
+    const project = findProject(projectId);
+    if (project && Number.isFinite(Number(project.previewMemberCount))) {
+      return Number(project.previewMemberCount);
+    }
     return appState.db.projectMembers.filter(
       (member) => member.projectId === projectId && member.status === "accepted"
     ).length;
   }
 
   function memberPreviewMarkup(project) {
+    const fallbackMembers = Array.isArray(project.previewMembers)
+      ? project.previewMembers.map((member) => ({
+          user: {
+            name: member.name || "Member",
+            profilePhoto: member.profilePhoto || "",
+          },
+        }))
+      : [];
     const members = membersForProject(project.id);
-    const visibleMembers = members.slice(0, 3);
-    const overflowMembers = Math.max(members.length - visibleMembers.length, 0);
+    const displayMembers = members.length ? members : fallbackMembers;
+    const visibleDisplayMembers = displayMembers.slice(0, 3);
+    const overflowMembers = Math.max(displayMembers.length - visibleDisplayMembers.length, 0);
+    const memberCount = Number.isFinite(Number(project.previewMemberCount))
+      ? Number(project.previewMemberCount)
+      : displayMembers.length;
 
     return `
       <div class="card-member-preview">
         <div class="card-member-avatars" aria-hidden="true">
-          ${visibleMembers
+          ${visibleDisplayMembers
             .map(
               (member) => `
                 <span class="card-member-avatar ${member.user?.profilePhoto ? "has-image" : ""}">
@@ -2554,7 +2663,7 @@ import { createClient } from "@supabase/supabase-js";
             .join("")}
           ${overflowMembers ? `<span class="card-member-avatar overflow">+${overflowMembers}</span>` : ""}
         </div>
-        <span class="card-member-copy">${members.length ? `${members.length} joined recently` : "Be the first to join"}</span>
+        <span class="card-member-copy">${memberCount ? `${memberCount} joined recently` : "Be the first to join"}</span>
       </div>
     `;
   }
@@ -2566,7 +2675,12 @@ import { createClient } from "@supabase/supabase-js";
   }
 
   function ownerForProject(project) {
-    return appState.db.users.find((user) => user.id === project.ownerId) || null;
+    return (
+      appState.db.users.find((user) => user.id === project.ownerId) || {
+        name: project.ownerName || "Unknown creator",
+        profilePhoto: project.ownerPhoto || "",
+      }
+    );
   }
 
   function requestsForProject(projectId) {
@@ -2816,7 +2930,9 @@ import { createClient } from "@supabase/supabase-js";
   }
 
   function renderCapacityBadge(project) {
-    const acceptedCount = projectMemberCount(project.id);
+    const acceptedCount = Number.isFinite(Number(project.previewMemberCount))
+      ? Number(project.previewMemberCount)
+      : projectMemberCount(project.id);
     if (project.teamSizeMode === "unlimited") {
       return `<span class="chip capacity-chip" title="Unlimited members">Unlimited</span>`;
     }
@@ -2841,9 +2957,12 @@ import { createClient } from "@supabase/supabase-js";
     const category = categoryConfigFor(project);
     const cardClass = options.extraClass ? ` ${options.extraClass}` : "";
     const ctaView = guestCta ? "auth" : null;
+    const cardAction = guestCta
+      ? `data-action="navigate" data-view="auth"`
+      : `data-action="view-project" data-id="${project.id}"`;
 
     return `
-      <article class="card hub-project-card project-click-card${cardClass}" data-action="view-project" data-id="${project.id}">
+      <article class="card hub-project-card project-click-card${cardClass}" ${cardAction}>
         <div class="hub-card-header">
           <div class="hub-card-heading">
             <p class="small activity-signal">${escapeHtml(activitySignalForProject(project))}</p>
@@ -4006,16 +4125,16 @@ import { createClient } from "@supabase/supabase-js";
   }
 
   function renderLandingPage() {
-    const featuredProjects = [...appState.db.projects]
+    const liveProjects = [...appState.db.projects]
       .sort((a, b) => {
         if (a.status === "completed" && b.status !== "completed") return 1;
         if (a.status !== "completed" && b.status === "completed") return -1;
         return new Date(b.createdAt) - new Date(a.createdAt);
-      })
-      .slice(0, 6);
-    const completedShowcase = appState.db.projects
-      .filter((project) => project.status === "completed" && project.coverImage)
-      .slice(0, 4);
+      });
+    const featuredProjects = (liveProjects.length ? liveProjects : LANDING_PREVIEW_PROJECTS).slice(0, 6);
+    const completedShowcase = appState.db.projects.filter((project) => project.status === "completed" && project.coverImage).slice(0, 4);
+    const showcaseProjects = completedShowcase.length ? completedShowcase : LANDING_SHOWCASE_PROJECTS;
+    const usingLandingFallback = !liveProjects.length;
     const heroPreviewProjects = featuredProjects.slice(0, 2);
     const viewportWidth = window.innerWidth || 1280;
     const baseVisibleCount = viewportWidth <= 700 ? 1 : viewportWidth <= 980 ? 2 : 3;
@@ -4044,7 +4163,7 @@ import { createClient } from "@supabase/supabase-js";
                   <p class="hub-cta-microcopy">Jump into something active</p>
                 </div>
               </div>
-              <p class="hero-cta-note">You don’t build here. You find people and stay aligned while you build elsewhere.</p>
+              <p class="hero-cta-note">You don't build here. You find people and stay aligned while you build elsewhere.</p>
             </div>
             <div class="landing-hero-visual">
               <div class="landing-preview-stack">
@@ -4112,17 +4231,16 @@ import { createClient } from "@supabase/supabase-js";
             </div>
           </div>
           ${
-            completedShowcase.length
-              ? `
+            showcaseProjects.length ? `
                 <div class="showcase-gallery">
-                  ${completedShowcase
+                  ${showcaseProjects
                     .map(
                       (project) => `
-                        <article class="showcase-card project-click-card" data-action="view-project" data-id="${project.id}" style="background-image: linear-gradient(180deg, rgba(36, 25, 15, 0.05), rgba(36, 25, 15, 0.72)), url('${escapeHtml(project.coverImage)}')">
+                        <article class="showcase-card project-click-card" ${usingLandingFallback ? `data-action="navigate" data-view="auth"` : `data-action="view-project" data-id="${project.id}"`} style="background-image: linear-gradient(180deg, rgba(36, 25, 15, 0.05), rgba(36, 25, 15, 0.72)), url('${escapeHtml(project.coverImage)}')">
                           <div class="showcase-card-copy">
                             <span class="showcase-card-tag">Completed project</span>
                             <h3>${escapeHtml(project.title)}</h3>
-                            <span class="showcase-card-cta">View project</span>
+                            <span class="showcase-card-cta">${usingLandingFallback ? "Join to explore" : "View project"}</span>
                           </div>
                         </article>
                       `
@@ -4566,6 +4684,8 @@ import { createClient } from "@supabase/supabase-js";
       .join("") || "PL";
   }
 })();
+
+
 
 
 
