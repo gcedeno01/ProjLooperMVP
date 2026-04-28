@@ -86,22 +86,11 @@ a {
   letter-spacing: -0.03em;
 }
 
-.hero-copy {
-  max-width: 640px;
-}
-
-.hero-topbar,
-.hero-bottom {
+.hero-topbar {
   display: flex;
   justify-content: space-between;
   gap: 24px;
   align-items: center;
-}
-
-.hero-bottom {
-  align-items: stretch;
-  padding-top: 4px;
-  border-top: 1px solid rgba(103, 120, 138, 0.10);
 }
 
 .brand-lockup {
@@ -136,13 +125,6 @@ a {
   color: var(--accent-2);
   font-weight: 700;
   order: 2;
-}
-
-.hero-copy p {
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.7;
-  max-width: 62ch;
 }
 
 .nav {
@@ -333,6 +315,14 @@ a {
 
 .auth-layout {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.auth-secondary-actions {
+  margin-top: 14px;
+}
+
+.auth-reset-panel {
+  max-width: 580px;
 }
 
 .panel,

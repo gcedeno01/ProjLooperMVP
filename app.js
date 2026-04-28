@@ -90,6 +90,7 @@ import { createClient } from "@supabase/supabase-js";
     supabaseEnabled: Boolean(supabase),
     realtimeChatChannels: [],
     shouldScrollChatsToBottom: false,
+    passwordRecoveryMode: false,
     projectFilter: "open",
     categoryFilter: "all",
     browseQuery: "",
@@ -354,6 +355,18 @@ import { createClient } from "@supabase/supabase-js";
       return;
     }
 
+    if (form.matches("#password-reset-request-form")) {
+      event.preventDefault();
+      requestPasswordReset(new FormData(form));
+      return;
+    }
+
+    if (form.matches("#password-reset-form")) {
+      event.preventDefault();
+      updateRecoveredPassword(new FormData(form));
+      return;
+    }
+
     if (form.matches("#profile-form")) {
       event.preventDefault();
       saveProfile(new FormData(form));
@@ -421,8 +434,8 @@ import { createClient } from "@supabase/supabase-js";
         await refreshRemoteData();
         syncRealtimeSubscriptions();
 
-        supabase.auth.onAuthStateChange((_event, nextSession) => {
-          syncSessionFromAuth(nextSession);
+        supabase.auth.onAuthStateChange((event, nextSession) => {
+          syncSessionFromAuth(event, nextSession);
         });
       } else {
         ensureSeedData();
@@ -451,14 +464,18 @@ import { createClient } from "@supabase/supabase-js";
     }
   }
 
-  async function syncSessionFromAuth(session) {
+  async function syncSessionFromAuth(event, session) {
     try {
+      appState.passwordRecoveryMode = event === "PASSWORD_RECOVERY";
       appState.sessionUserId = session?.user?.id || null;
       if (session?.user) {
         await ensureRemoteProfile(session.user);
       }
       await refreshRemoteData();
       syncRealtimeSubscriptions();
+      if (appState.passwordRecoveryMode) {
+        setRoute("reset-password");
+      }
     } catch (error) {
       console.error("Project Looper auth sync failed.", error);
       setFlash("We couldn't refresh your live session just yet.", "error");
@@ -836,7 +853,7 @@ import { createClient } from "@supabase/supabase-js";
     }
 
     if (
-      ["home", "auth", "create", "browse", "messages", "communities", "account", "about", "feedback", "privacy", "terms"].includes(view)
+      ["home", "auth", "reset-password", "create", "browse", "messages", "communities", "account", "about", "feedback", "privacy", "terms"].includes(view)
     ) {
       return { view, id: id || null };
     }
@@ -1818,12 +1835,90 @@ import { createClient } from "@supabase/supabase-js";
       }
       appState.sessionUserId = null;
       appState.authFlow = null;
+      appState.passwordRecoveryMode = false;
       syncRealtimeSubscriptions();
       persistDatabase();
       setFlash("You've been logged out.", "success");
       setRoute("landing", null, { replace: true });
     } catch (error) {
       setFlash(error.message || "We couldn't log you out right now.", "error");
+      render();
+    }
+  }
+
+  function passwordResetRedirectUrl() {
+    if (isFileProtocol()) {
+      return `${window.location.origin}${window.location.pathname}#/reset-password`;
+    }
+
+    return `${window.location.origin}/reset-password`;
+  }
+
+  async function requestPasswordReset(formData) {
+    const email = String(formData.get("email") || "").trim().toLowerCase();
+
+    if (!email) {
+      setFlash("Enter your email first so we can send a reset link.", "error");
+      render();
+      return;
+    }
+
+    if (!supabase) {
+      setFlash("Password reset is available on the live Supabase app.", "error");
+      render();
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: passwordResetRedirectUrl(),
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setFlash("Password reset link sent. Check your email for the next step.", "success");
+      render();
+    } catch (error) {
+      setFlash(error.message || "We couldn't send the reset email right now.", "error");
+      render();
+    }
+  }
+
+  async function updateRecoveredPassword(formData) {
+    const password = String(formData.get("password") || "").trim();
+    const confirmPassword = String(formData.get("confirmPassword") || "").trim();
+
+    if (!password || !confirmPassword) {
+      setFlash("Enter and confirm your new password.", "error");
+      render();
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setFlash("The new passwords do not match.", "error");
+      render();
+      return;
+    }
+
+    if (!supabase) {
+      setFlash("Password reset is available on the live Supabase app.", "error");
+      render();
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) {
+        throw error;
+      }
+
+      appState.passwordRecoveryMode = false;
+      setFlash("Password updated. You can log in with the new password now.", "success");
+      setRoute("auth");
+    } catch (error) {
+      setFlash(error.message || "We couldn't update your password right now.", "error");
       render();
     }
   }
@@ -2850,7 +2945,7 @@ import { createClient } from "@supabase/supabase-js";
 
         <section class="auth-panel">
           <h2>Log in</h2>
-          <p>Use the seeded demo accounts if you want to explore first: <strong>avery@example.com</strong> or <strong>jordan@example.com</strong> with password <strong>demo123</strong>.</p>
+          <p>Log in to rejoin your groups, post updates, and keep projects moving.</p>
           <form id="login-form">
             <div class="field">
               <label for="login-email">Email</label>
@@ -2862,8 +2957,59 @@ import { createClient } from "@supabase/supabase-js";
             </div>
             <button class="primary-btn" type="submit">Log in</button>
           </form>
+          <div class="auth-secondary-actions">
+            <button class="ghost-btn" type="button" data-action="navigate" data-view="reset-password">Forgot password?</button>
+          </div>
         </section>
       </div>
+    `;
+  }
+
+  function renderResetPasswordPage() {
+    const hasRecoverySession = Boolean(appState.sessionUserId && appState.passwordRecoveryMode);
+
+    return `
+      <main class="stack">
+        <section class="panel auth-reset-panel">
+          <div class="section-heading">
+            <div>
+              <h2>${hasRecoverySession ? "Set a new password" : "Reset your password"}</h2>
+              <p>${
+                hasRecoverySession
+                  ? "You're in recovery mode. Choose a new password to get back into your account."
+                  : "Enter your email and we'll send you a reset link."
+              }</p>
+            </div>
+            <button class="small-btn" data-action="navigate" data-view="auth">Back to log in</button>
+          </div>
+
+          ${
+            hasRecoverySession
+              ? `
+                <form id="password-reset-form" class="stack">
+                  <div class="field">
+                    <label for="reset-password">New password</label>
+                    <input id="reset-password" type="password" name="password" required />
+                  </div>
+                  <div class="field">
+                    <label for="reset-password-confirm">Confirm new password</label>
+                    <input id="reset-password-confirm" type="password" name="confirmPassword" required />
+                  </div>
+                  <button class="primary-btn" type="submit">Update password</button>
+                </form>
+              `
+              : `
+                <form id="password-reset-request-form" class="stack">
+                  <div class="field">
+                    <label for="reset-email">Email</label>
+                    <input id="reset-email" type="email" name="email" required />
+                  </div>
+                  <button class="primary-btn" type="submit">Send reset link</button>
+                </form>
+              `
+          }
+        </section>
+      </main>
     `;
   }
 
@@ -2882,8 +3028,8 @@ import { createClient } from "@supabase/supabase-js";
           !user
             ? `
               <section class="panel">
-                <h2>Try the demo</h2>
-                <p>Use <strong>avery@example.com</strong> or <strong>jordan@example.com</strong> with password <strong>demo123</strong>, or create a fresh account to start building together.</p>
+                <h2>Jump in</h2>
+                <p>Create a fresh account to start a project, join a group, and build together.</p>
                 <div class="inline-actions">
                   <button class="primary-btn" data-action="navigate" data-view="auth">Log in / Sign up</button>
                 </div>
@@ -4312,11 +4458,6 @@ import { createClient } from "@supabase/supabase-js";
                 </div>
               </div>
             </div>
-            <div class="hero-bottom">
-              <div class="hero-copy">
-                <p>Loading live projects, groups, and updates...</p>
-              </div>
-            </div>
           </header>
         </div>
       `;
@@ -4378,11 +4519,6 @@ import { createClient } from "@supabase/supabase-js";
               ${!appState.sessionUserId ? `<button class="primary-btn" data-action="navigate" data-view="auth">Log in / Sign up</button>` : ""}
             </nav>
           </div>
-          <div class="hero-bottom">
-            <div class="hero-copy">
-              <p>Build passion projects, portfolio pieces, and creative ideas with people who want to make things together.</p>
-            </div>
-          </div>
         </header>
 
         ${flash}
@@ -4394,6 +4530,8 @@ import { createClient } from "@supabase/supabase-js";
               ? renderLandingPage()
             : appState.route.view === "auth"
               ? renderAuth()
+            : appState.route.view === "reset-password"
+              ? renderResetPasswordPage()
             : `
               <div class="layout ${appState.route.view === "home" ? "home-layout" : ""} ${appState.route.view === "create" ? "create-layout" : ""} ${appState.route.view === "browse" ? "browse-layout" : ""} ${appState.route.view === "communities" ? "communities-layout" : ""} ${appState.route.view === "community" ? "community-route-layout" : ""} ${appState.route.view === "project" ? "project-route-layout" : ""} ${appState.route.view === "messages" ? "messages-route-layout" : ""}">
                 ${appState.route.view === "project" ? renderProjectPage(appState.route.id) : appState.route.view === "community" ? renderCommunityPage(appState.route.id) : appState.route.view === "communities" ? renderCommunitiesPage() : appState.route.view === "messages" ? renderMessagesPage() : appState.route.view === "browse" ? renderBrowsePage() : appState.route.view === "home" ? renderHomeHub() : appState.route.view === "create" ? renderCreateProjectPage() : appState.route.view === "about" ? renderAboutPage() : appState.route.view === "feedback" ? renderFeedbackPage() : appState.route.view === "privacy" ? renderPrivacyPage() : appState.route.view === "terms" ? renderTermsPage() : renderLandingPage()}
