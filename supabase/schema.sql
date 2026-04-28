@@ -105,6 +105,21 @@ create index if not exists project_chat_messages_project_id_idx on public.projec
 create index if not exists community_members_community_key_idx on public.community_members (community_key);
 create index if not exists community_posts_community_key_idx on public.community_posts (community_key);
 
+do $$
+begin
+  begin
+    execute 'alter publication supabase_realtime add table public.project_chat_messages';
+  exception
+    when duplicate_object then null;
+  end;
+
+  begin
+    execute 'alter publication supabase_realtime add table public.community_posts';
+  exception
+    when duplicate_object then null;
+  end;
+end $$;
+
 drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
 before update on public.profiles

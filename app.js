@@ -88,7 +88,7 @@ import { createClient } from "@supabase/supabase-js";
     isLoading: true,
     isRemoteDataReady: false,
     supabaseEnabled: Boolean(supabase),
-    realtimeChatChannel: null,
+    realtimeChatChannels: [],
     shouldScrollChatsToBottom: false,
     projectFilter: "open",
     categoryFilter: "all",
@@ -285,6 +285,7 @@ import { createClient } from "@supabase/supabase-js";
     if (action === "open-chat") {
       appState.activeChatProjectId = id;
       appState.chatMinimized = false;
+      appState.shouldScrollChatsToBottom = true;
       render();
       return;
     }
@@ -333,6 +334,7 @@ import { createClient } from "@supabase/supabase-js";
       if (id) {
         appState.activeChatProjectId = id;
       }
+      appState.shouldScrollChatsToBottom = true;
       setRoute("messages", appState.activeChatProjectId || id || null);
     }
   });
@@ -539,6 +541,10 @@ import { createClient } from "@supabase/supabase-js";
     ensureProjectMetadata();
     ensureCommunityMetadata();
     persistDatabase();
+
+    if (supabase && appState.sessionUserId) {
+      syncRealtimeSubscriptions();
+    }
   }
 
   function syncRealtimeSubscriptions() {
@@ -546,33 +552,74 @@ import { createClient } from "@supabase/supabase-js";
       return;
     }
 
-    if (appState.realtimeChatChannel) {
-      supabase.removeChannel(appState.realtimeChatChannel);
-      appState.realtimeChatChannel = null;
+    if (Array.isArray(appState.realtimeChatChannels) && appState.realtimeChatChannels.length) {
+      appState.realtimeChatChannels.forEach((channel) => {
+        supabase.removeChannel(channel);
+      });
+      appState.realtimeChatChannels = [];
     }
 
     if (!appState.sessionUserId) {
       return;
     }
 
-    appState.realtimeChatChannel = supabase
-      .channel(`project-chat-${appState.sessionUserId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "project_chat_messages",
-        },
-        handleRealtimeChatInsert
-      )
-      .subscribe();
+    const joinedProjectIds = [
+      ...new Set(
+        appState.db.projectMembers
+          .filter(
+            (member) =>
+              member.userId === appState.sessionUserId && member.status === "accepted"
+          )
+          .map((member) => member.projectId)
+          .filter(Boolean)
+      ),
+    ];
+
+    console.debug("[chat] sync subscriptions", {
+      sessionUserId: appState.sessionUserId,
+      joinedProjectIds,
+      selectedProjectId: appState.activeChatProjectId || appState.route.id || null,
+    });
+
+    appState.realtimeChatChannels = joinedProjectIds.map((projectId) =>
+      supabase
+        .channel(`project-chat-${appState.sessionUserId}-${projectId}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "project_chat_messages",
+            filter: `project_id=eq.${projectId}`,
+          },
+          (payload) => handleRealtimeChatInsert(payload, projectId)
+        )
+        .subscribe((status) => {
+          console.debug("[chat] realtime subscription status", {
+            projectId,
+            status,
+          });
+        })
+    );
   }
 
-  function handleRealtimeChatInsert(payload) {
+  function handleRealtimeChatInsert(payload, subscribedProjectId = null) {
     const nextChat = mapProjectChatRow(payload.new || {});
+    console.debug("[chat] realtime payload received", {
+      subscribedProjectId,
+      payloadProjectId: nextChat.projectId,
+      selectedProjectId: appState.activeChatProjectId || appState.route.id || null,
+      payload,
+    });
 
     if (!nextChat.projectId || !isProjectMember(nextChat.projectId, appState.sessionUserId)) {
+      console.debug("[chat] realtime payload ignored", {
+        sessionUserId: appState.sessionUserId,
+        payloadProjectId: nextChat.projectId,
+        isMember: nextChat.projectId
+          ? isProjectMember(nextChat.projectId, appState.sessionUserId)
+          : false,
+      });
       return;
     }
 
@@ -2498,6 +2545,12 @@ import { createClient } from "@supabase/supabase-js";
     const projectId = String(formData.get("projectId") || "");
     const content = String(formData.get("content") || "").trim();
 
+    console.debug("[chat] send message attempt", {
+      sessionUserId: user?.id || null,
+      selectedProjectId: appState.activeChatProjectId || appState.route.id || null,
+      insertedMessageProjectId: projectId,
+    });
+
     if (!user || !projectId || !content) {
       setFlash("Write a message before sending.", "error");
       render();
@@ -2537,6 +2590,10 @@ import { createClient } from "@supabase/supabase-js";
 
       appState.activeChatProjectId = projectId;
       appState.shouldScrollChatsToBottom = true;
+      console.debug("[chat] message persisted", {
+        sessionUserId: user.id,
+        insertedMessageProjectId: projectId,
+      });
       render();
     } catch (error) {
       setFlash(error.message || "We couldn't send that message right now.", "error");
@@ -3979,6 +4036,12 @@ import { createClient } from "@supabase/supabase-js";
       findProject(appState.activeChatProjectId) || conversations[0].project;
     const minimized = appState.chatMinimized;
 
+    console.debug("[chat] render dock", {
+      selectedProjectId: activeProject?.id || null,
+      conversationProjectIds: conversations.map(({ project }) => project.id),
+      minimized,
+    });
+
     return `
       <aside class="chat-dock ${minimized ? "minimized" : ""}">
         <div class="chat-dock-header">
@@ -4051,6 +4114,13 @@ import { createClient } from "@supabase/supabase-js";
       conversations[0].project;
 
     appState.activeChatProjectId = activeProject.id;
+
+    console.debug("[chat] render messages page", {
+      selectedProjectId: activeProject.id,
+      routeProjectId: appState.route.id || null,
+      activeChatProjectId: appState.activeChatProjectId,
+      conversationProjectIds: conversations.map(({ project }) => project.id),
+    });
 
     return `
       <main class="messages-layout">
