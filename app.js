@@ -1850,7 +1850,7 @@
         throw error;
       }
 
-      if (data.user) {
+      if (data.user && data.session?.user?.id) {
         await ensureRemoteProfile({
           ...data.user,
           user_metadata: {
