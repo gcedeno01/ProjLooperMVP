@@ -1264,6 +1264,13 @@ select:focus {
   font-weight: 600;
 }
 
+.demo-badge {
+  background: rgba(63, 124, 255, 0.08);
+  border-color: rgba(63, 124, 255, 0.18);
+  color: var(--accent-2);
+  font-weight: 700;
+}
+
 .capacity-chip {
   min-width: 56px;
 }
@@ -1325,6 +1332,15 @@ select:focus {
   border-color: rgba(163, 63, 53, 0.25);
   background: rgba(163, 63, 53, 0.08);
   color: var(--danger);
+}
+
+.example-only-btn[disabled] {
+  background: rgba(19, 32, 51, 0.08);
+  border-color: rgba(19, 32, 51, 0.12);
+  color: var(--muted);
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
 }
 
 .detail-list {
@@ -2424,6 +2440,12 @@ select:focus {
 
 .site-footer-main p {
   margin: 0;
+}
+
+.beta-note {
+  margin-top: 12px;
+  font-size: 0.92rem;
+  color: var(--muted);
 }
 
 .home-sidebar .panel {

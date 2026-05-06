@@ -777,6 +777,7 @@
           repositoryUrl: row.repository_url || "",
           projectUrl: row.project_url || "",
           coverImage: row.cover_image || "",
+          isDemoProject: Boolean(row.is_demo_project),
           category: category.key,
           categoryLabel: row.category_label || category.label,
           categoryIcon: category.icon,
@@ -1161,30 +1162,13 @@
       createdAt: new Date().toISOString(),
     };
 
-    const seededChats = [
-      {
-        id: createId("chat"),
-        projectId: projectTwo.id,
-        authorId: users[1].id,
-        content: "I dropped the first shot list in the project updates. Anyone want to help with titles?",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: createId("chat"),
-        projectId: projectThree.id,
-        authorId: users[1].id,
-        content: "Starting with contributors who love web nostalgia and textured digital collage.",
-        createdAt: new Date().toISOString(),
-      },
-    ];
-
     appState.db = {
       users,
       projects: [projectThree, projectOne, projectTwo],
       projectMembers: [memberOwnerOne, memberOwnerTwo, memberOwnerThree],
       joinRequests: [pendingRequest],
       projectUpdates: [initialUpdate],
-      projectChats: seededChats,
+      projectChats: [],
     };
 
     persistDatabase();
@@ -1306,6 +1290,7 @@
           category: sample.category,
           categoryLabel: categoryConfigFor(sample.category).label,
           categoryIcon: categoryConfigFor(sample.category).icon,
+          isDemoProject: true,
           status: "completed",
           createdAt: new Date().toISOString(),
           completedAt: new Date().toISOString(),
@@ -1325,6 +1310,10 @@
         if (project.status !== "completed") {
           project.status = "completed";
           project.completedAt = project.completedAt || new Date().toISOString();
+          changed = true;
+        }
+        if (!project.isDemoProject) {
+          project.isDemoProject = true;
           changed = true;
         }
         if (!project.coverImage && sample.coverImage) {
@@ -1376,6 +1365,7 @@
         projectUrl: "",
         coverImage: "",
         status: "open",
+        isDemoProject: false,
         teamSizeMode: "fixed",
         teamSizeValue: 3,
         durationType: "fixed",
@@ -1394,6 +1384,7 @@
         projectUrl: "",
         coverImage: "",
         status: "active",
+        isDemoProject: false,
         teamSizeMode: "fixed",
         teamSizeValue: 3,
         durationType: "fixed",
@@ -1412,6 +1403,7 @@
         projectUrl: "",
         coverImage: "",
         status: "open",
+        isDemoProject: true,
         teamSizeMode: "fixed",
         teamSizeValue: 4,
         durationType: "fixed",
@@ -1430,6 +1422,7 @@
         projectUrl: "",
         coverImage: "",
         status: "active",
+        isDemoProject: true,
         teamSizeMode: "unlimited",
         teamSizeValue: null,
         durationType: "open",
@@ -1457,6 +1450,7 @@
           category: sample.category,
           categoryLabel: categoryConfigFor(sample.category).label,
           categoryIcon: categoryConfigFor(sample.category).icon,
+          isDemoProject: Boolean(sample.isDemoProject),
           status: sample.status,
           teamSizeMode: sample.teamSizeMode || "fixed",
           teamSizeValue:
@@ -1485,6 +1479,10 @@
       } else {
         if (!project.coverImage) {
           project.coverImage = "";
+        }
+        if (Boolean(project.isDemoProject) !== Boolean(sample.isDemoProject)) {
+          project.isDemoProject = Boolean(sample.isDemoProject);
+          changed = true;
         }
         if (project.status === "completed") {
           project.status = sample.status;
@@ -1622,9 +1620,19 @@
 
   function ensureProjectMetadata() {
     let changed = false;
+    const seededDemoChatSnippets = new Set([
+      "I dropped the first shot list in the project updates. Anyone want to help with titles?",
+      "Starting with contributors who love web nostalgia and textured digital collage.",
+    ]);
 
     if (!Array.isArray(appState.db.projectChats)) {
       appState.db.projectChats = [];
+      changed = true;
+    }
+
+    const filteredChats = appState.db.projectChats.filter((chat) => !seededDemoChatSnippets.has(chat.content));
+    if (filteredChats.length !== appState.db.projectChats.length) {
+      appState.db.projectChats = filteredChats;
       changed = true;
     }
 
@@ -1639,6 +1647,21 @@
     }
 
     appState.db.projects.forEach((project) => {
+      if (!Object.prototype.hasOwnProperty.call(project, "isDemoProject")) {
+        project.isDemoProject = false;
+        changed = true;
+      }
+
+      if (["Neon Alley Poster Series", "Dreamscape Portfolio Microsite", "Creator Stories Editorial Pack", "Neighborhood Fix-It Guide"].includes(project.title) && !project.isDemoProject) {
+        project.isDemoProject = true;
+        changed = true;
+      }
+
+      if (["Open Studio Poster Set", "Pixel Dungeon Build Tracker"].includes(project.title) && project.isDemoProject) {
+        project.isDemoProject = false;
+        changed = true;
+      }
+
       if (!Object.prototype.hasOwnProperty.call(project, "repositoryUrl")) {
         project.repositoryUrl = "";
         changed = true;
@@ -2102,6 +2125,7 @@
         repositoryUrl,
         projectUrl,
         coverImage,
+        isDemoProject: false,
         status: "open",
         createdAt: new Date().toISOString(),
         completedAt: null,
@@ -2120,6 +2144,7 @@
           repository_url: project.repositoryUrl,
           project_url: project.projectUrl,
           cover_image: project.coverImage,
+          is_demo_project: project.isDemoProject,
           category: project.category,
           category_label: project.categoryLabel,
           category_icon: project.category,
@@ -2180,6 +2205,12 @@
       setRoute("auth");
       return;
     }
+    const project = findProject(projectId);
+    if (project?.isDemoProject) {
+      setFlash("This example project is view-only during beta.", "error");
+      render();
+      return;
+    }
     appState.joinRequestProjectId = projectId;
     render();
   }
@@ -2195,6 +2226,12 @@
 
     const project = findProject(projectId);
     if (!project) return;
+
+    if (project.isDemoProject) {
+      setFlash("This example project is view-only during beta.", "error");
+      render();
+      return;
+    }
 
     if (project.ownerId === user.id) {
       setFlash("You already lead this group.", "error");
@@ -2425,6 +2462,7 @@
             repository_url: project.repositoryUrl,
             project_url: project.projectUrl,
             cover_image: project.coverImage,
+            is_demo_project: Boolean(project.isDemoProject),
           })
           .eq("id", project.id);
 
@@ -2850,7 +2888,8 @@
       current &&
       project.status !== "completed" &&
       project.ownerId !== current.id &&
-      !isProjectMember(project.id, current.id);
+      !isProjectMember(project.id, current.id) &&
+      !project.isDemoProject;
     const category = categoryConfigFor(project);
 
     return `
@@ -2866,6 +2905,7 @@
         <div class="meta-row">
           ${renderCapacityBadge(project)}
           ${renderCategoryBadge(project)}
+          ${renderDemoBadge(project)}
           <span class="chip">${escapeHtml(durationChipLabel(project))}</span>
         </div>
         <div class="chips">
@@ -2875,7 +2915,7 @@
           <div class="card-footer-left">
             ${memberPreviewMarkup(project)}
           </div>
-          ${canJoin ? `<button class="primary-btn" data-action="join-project" data-id="${project.id}">Join group</button>` : ""}
+          ${renderProjectCta(project, { canJoin })}
         </div>
       </article>
     `;
@@ -2929,6 +2969,14 @@
     return `<span class="chip category-chip" title="${escapeHtml(category.label)}"><span aria-hidden="true">${category.icon}</span><span>${escapeHtml(category.shortLabel)}</span></span>`;
   }
 
+  function renderDemoBadge(project) {
+    if (!project.isDemoProject) {
+      return "";
+    }
+
+    return `<span class="chip demo-badge" title="Example project shown for beta preview">Example Project</span>`;
+  }
+
   function renderCapacityBadge(project) {
     const acceptedCount = Number.isFinite(Number(project.previewMemberCount))
       ? Number(project.previewMemberCount)
@@ -2937,6 +2985,22 @@
       return `<span class="chip capacity-chip" title="Unlimited members">Unlimited</span>`;
     }
     return `<span class="chip capacity-chip" title="${acceptedCount} of ${project.teamSizeValue || project.teamSize} spots filled">${acceptedCount}/${project.teamSizeValue || project.teamSize}</span>`;
+  }
+
+  function renderProjectCta(project, options = {}) {
+    if (project.isDemoProject) {
+      return `<button class="secondary-btn example-only-btn" type="button" disabled aria-disabled="true">Example Only</button>`;
+    }
+
+    if (options.guestCta) {
+      return `<button class="primary-btn" data-action="navigate" data-view="${options.ctaView || "auth"}">Join group</button>`;
+    }
+
+    if (!options.canJoin) {
+      return "";
+    }
+
+    return `<button class="primary-btn" data-action="join-project" data-id="${project.id}">Join group</button>`;
   }
 
   function hubProjectCard(project, options = {}) {
@@ -2952,7 +3016,8 @@
         ? true
         : current &&
           project.ownerId !== current.id &&
-          !isProjectMember(project.id, current.id));
+          !isProjectMember(project.id, current.id)) &&
+      !project.isDemoProject;
     const displayStatus = project.status === "completed" ? "completed" : "open";
     const category = categoryConfigFor(project);
     const cardClass = options.extraClass ? ` ${options.extraClass}` : "";
@@ -2974,18 +3039,13 @@
         <div class="meta-row">
           ${renderCapacityBadge(project)}
           ${renderCategoryBadge(project)}
+          ${renderDemoBadge(project)}
         </div>
         <div class="project-actions card-footer-actions">
           <div class="card-footer-left">
             ${memberPreviewMarkup(project)}
           </div>
-          ${
-            canJoin
-              ? guestCta
-                ? `<button class="primary-btn" data-action="navigate" data-view="${ctaView}">Join group</button>`
-                : `<button class="primary-btn" data-action="join-project" data-id="${project.id}">Join group</button>`
-              : ""
-          }
+          ${renderProjectCta(project, { canJoin, guestCta, ctaView })}
         </div>
       </article>
     `;
@@ -3001,7 +3061,8 @@
       current &&
       project.status !== "completed" &&
       project.ownerId !== current.id &&
-      !isProjectMember(project.id, current.id);
+      !isProjectMember(project.id, current.id) &&
+      !project.isDemoProject;
     const imageMarkup = project.coverImage
       ? `<img class="browse-card-image" src="${escapeHtml(project.coverImage)}" alt="${escapeHtml(project.title)}" />`
       : `<div class="browse-card-image placeholder browse-card-icon-wrap">${renderProjectTypeVisual(project)}</div>`;
@@ -3026,13 +3087,14 @@
           <div class="meta-row">
             ${renderCapacityBadge(project)}
             ${renderCategoryBadge(project)}
+            ${renderDemoBadge(project)}
             <span class="chip">${escapeHtml(durationChipLabel(project))}</span>
           </div>
           <div class="project-actions card-footer-actions">
             <div class="card-footer-left">
               ${memberPreviewMarkup(project)}
             </div>
-            ${canJoin ? `<button class="primary-btn" data-action="join-project" data-id="${project.id}">Join group</button>` : ""}
+            ${renderProjectCta(project, { canJoin })}
           </div>
         </div>
       </article>
@@ -3877,9 +3939,10 @@
                     <div class="meta-row">
                       ${renderCategoryBadge(featuredProject)}
                       ${renderCapacityBadge(featuredProject)}
+                      ${renderDemoBadge(featuredProject)}
                     </div>
                   </div>
-                  <button class="primary-btn" data-action="join-project" data-id="${featuredProject.id}">Join group</button>
+                  ${renderProjectCta(featuredProject, { canJoin: !featuredProject.isDemoProject })}
                 </article>
               `
               : `<div class="empty-state"><p>No featured project yet. Start one and give this community something to rally around.</p></div>`
@@ -3990,6 +4053,7 @@
               </div>
               <div class="chips">
                 ${renderCategoryBadge(project)}
+                ${renderDemoBadge(project)}
                 ${project.skillsNeeded.map((skill) => `<span class="chip">${escapeHtml(skill)}</span>`).join("") || `<span class="chip">General collaboration</span>`}
               </div>
               <div class="project-overview-list">
@@ -4007,7 +4071,7 @@
                 ${project.projectUrl ? `<a class="resource-link" href="${escapeHtml(project.projectUrl)}" target="_blank" rel="noreferrer">Project link</a>` : ""}
               </div>
               <div class="project-actions">
-                ${user && !isOwner && !isMember && !pendingForViewer && project.status !== "completed" ? `<button class="primary-btn" data-action="join-project" data-id="${project.id}">Join group</button>` : ""}
+                ${user && !isOwner && !isMember && !pendingForViewer && project.status !== "completed" ? renderProjectCta(project, { canJoin: !project.isDemoProject }) : ""}
                 ${isMember ? `<button class="secondary-btn" data-action="open-chat" data-id="${project.id}">Open team chat</button>` : ""}
                 ${pendingForViewer ? `<span class="status pending">Request pending</span>` : ""}
                 ${isOwner ? `<button class="secondary-btn" data-action="open-project-editor" data-id="${project.id}">Edit project</button>` : ""}
@@ -4259,7 +4323,7 @@
     const messages = chatsForProject(projectId);
 
     if (!messages.length) {
-      return `<div class="empty-state"><p>No messages yet. Start the conversation and get the project moving.</p></div>`;
+      return `<div class="empty-state"><p>No messages yet. Start the conversation.</p></div>`;
     }
 
     return `
@@ -4542,6 +4606,7 @@
           <div>
             <strong>Project Looper</strong>
             <p>Build projects together.</p>
+            <p class="beta-note">Project Looper is currently in early beta. Some example projects are included to demonstrate platform functionality.</p>
           </div>
           <nav class="footer-nav" aria-label="Footer">
             <button class="footer-link" data-action="navigate" data-view="about">About</button>

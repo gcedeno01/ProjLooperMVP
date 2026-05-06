@@ -40,6 +40,7 @@ create table if not exists public.projects (
   repository_url text not null default '',
   project_url text not null default '',
   cover_image text not null default '',
+  is_demo_project boolean not null default false,
   status text not null default 'open' check (status in ('open', 'active', 'completed')),
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
@@ -49,6 +50,8 @@ create table if not exists public.projects (
   constraint fixed_projects_require_duration
     check (duration_type = 'open' or coalesce(duration_value, '') <> '')
 );
+
+alter table public.projects add column if not exists is_demo_project boolean not null default false;
 
 create table if not exists public.project_members (
   id uuid primary key default gen_random_uuid(),

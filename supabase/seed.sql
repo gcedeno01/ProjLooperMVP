@@ -144,6 +144,7 @@ insert into public.projects (
   repository_url,
   project_url,
   cover_image,
+  is_demo_project,
   status,
   created_at
 )
@@ -164,6 +165,7 @@ values
     '',
     'https://example.com/open-studio-poster-set',
     '',
+    false,
     'open',
     '2026-04-05T15:00:00Z'
   ),
@@ -183,6 +185,7 @@ values
     'https://github.com/example/pixel-dungeon-build-tracker',
     '',
     '',
+    false,
     'active',
     '2026-04-03T18:00:00Z'
   ),
@@ -202,6 +205,7 @@ values
     '',
     'https://example.com/creator-stories-editorial-pack',
     '',
+    true,
     'open',
     '2026-04-07T12:00:00Z'
   ),
@@ -221,6 +225,7 @@ values
     '',
     'https://example.com/neighborhood-fix-it-guide',
     '',
+    true,
     'active',
     '2026-04-01T16:00:00Z'
   )
@@ -240,6 +245,7 @@ set
   repository_url = excluded.repository_url,
   project_url = excluded.project_url,
   cover_image = excluded.cover_image,
+  is_demo_project = excluded.is_demo_project,
   status = excluded.status;
 
 insert into public.project_members (project_id, user_id, role, status, joined_at)
@@ -297,26 +303,11 @@ values
     '2026-04-12T09:20:00Z'
   );
 
-insert into public.project_chat_messages (project_id, author_id, content, created_at)
-values
-  (
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    '11111111-1111-1111-1111-111111111111',
-    'Dropped the first tracker pass. If anyone wants to shape the issue labels, jump in.',
-    '2026-04-10T18:25:00Z'
-  ),
-  (
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    '33333333-3333-3333-3333-333333333333',
-    'I can help with the playtest summary layout tomorrow.',
-    '2026-04-10T19:05:00Z'
-  ),
-  (
-    'dddddddd-dddd-dddd-dddd-dddddddddddd',
-    '22222222-2222-2222-2222-222222222222',
-    'Shared a first pass of the repair categories. Happy to tighten the language next.',
-    '2026-04-12T09:40:00Z'
-  );
+delete from public.project_chat_messages
+where
+  (project_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' and author_id = '11111111-1111-1111-1111-111111111111' and content = 'Dropped the first tracker pass. If anyone wants to shape the issue labels, jump in.' and created_at = '2026-04-10T18:25:00Z')
+  or (project_id = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb' and author_id = '33333333-3333-3333-3333-333333333333' and content = 'I can help with the playtest summary layout tomorrow.' and created_at = '2026-04-10T19:05:00Z')
+  or (project_id = 'dddddddd-dddd-dddd-dddd-dddddddddddd' and author_id = '22222222-2222-2222-2222-222222222222' and content = 'Shared a first pass of the repair categories. Happy to tighten the language next.' and created_at = '2026-04-12T09:40:00Z');
 
 insert into public.community_members (community_key, user_id, joined_at)
 values
