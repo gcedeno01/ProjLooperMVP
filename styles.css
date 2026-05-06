@@ -2547,7 +2547,8 @@ select:focus {
 }
 
 .info-page {
-  max-width: 860px;
+  max-width: none;
+  width: 100%;
 }
 
 .info-block {
