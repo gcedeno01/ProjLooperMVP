@@ -4679,7 +4679,7 @@
             <textarea id="feedback-notes" placeholder="What feels clear, confusing, promising, or missing?"></textarea>
           </div>
           <div class="inline-actions">
-            <a class="primary-btn footer-link-btn" href="mailto:hello@projectlooper.app?subject=Project%20Looper%20Feedback">Send feedback by email</a>
+            <a class="primary-btn footer-link-btn" href="mailto:cedeno.gianni@gmail.com?subject=Project%20Looper%20Feedback">Send feedback by email</a>
           </div>
         </section>
       </main>
@@ -4829,7 +4829,7 @@
             : `
               <div class="layout ${appState.route.view === "home" ? "home-layout" : ""} ${appState.route.view === "create" ? "create-layout" : ""} ${appState.route.view === "browse" ? "browse-layout" : ""} ${appState.route.view === "communities" ? "communities-layout" : ""} ${appState.route.view === "community" ? "community-route-layout" : ""} ${appState.route.view === "project" ? "project-route-layout" : ""} ${appState.route.view === "messages" ? "messages-route-layout" : ""}">
                 ${appState.route.view === "project" ? renderProjectPage(appState.route.id) : appState.route.view === "community" ? renderCommunityPage(appState.route.id) : appState.route.view === "communities" ? renderCommunitiesPage() : appState.route.view === "messages" ? renderMessagesPage() : appState.route.view === "browse" ? renderBrowsePage() : appState.route.view === "home" ? renderHomeHub() : appState.route.view === "create" ? renderCreateProjectPage() : appState.route.view === "about" ? renderAboutPage() : appState.route.view === "feedback" ? renderFeedbackPage() : appState.route.view === "privacy" ? renderPrivacyPage() : appState.route.view === "terms" ? renderTermsPage() : renderLandingPage()}
-                ${appState.route.view === "home" || appState.route.view === "browse" || appState.route.view === "communities" || appState.route.view === "community" || appState.route.view === "create" || appState.route.view === "project" || appState.route.view === "messages" ? "" : renderSidebar()}
+                ${appState.route.view === "home" || appState.route.view === "browse" || appState.route.view === "communities" || appState.route.view === "community" || appState.route.view === "create" || appState.route.view === "project" || appState.route.view === "messages" || appState.route.view === "about" || appState.route.view === "feedback" || appState.route.view === "privacy" || appState.route.view === "terms" ? "" : renderSidebar()}
               </div>
             `
         }
