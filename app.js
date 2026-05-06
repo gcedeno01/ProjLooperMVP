@@ -1,4 +1,9 @@
-﻿import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
+import { inject } from "@vercel/analytics";
+
+// Initialize Vercel Web Analytics
+inject();
+
 
 (function () {
   const STORAGE_KEY = "project-looper-mvp";
