@@ -2120,6 +2120,20 @@ select:focus {
   gap: 14px;
 }
 
+.community-composer {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(103, 120, 138, 0.16);
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.community-composer p {
+  margin: 6px 0 0;
+}
+
 .community-post {
   padding: 18px 0;
   border-top: 1px solid rgba(103, 120, 138, 0.14);

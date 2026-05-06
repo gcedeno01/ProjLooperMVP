@@ -202,6 +202,7 @@
     projectEditorTeamSizeMode: "fixed",
     homeCarouselIndex: 0,
     landingCarouselIndex: 0,
+    communityComposer: { communityKey: null, promptType: "ask" },
   };
 
   window.addEventListener("popstate", handleRouteChange);
@@ -403,11 +404,22 @@
       }
 
       const community = communityConfigFor(actionTarget.dataset.community);
-      const promptMessage =
-        promptType === "resource"
-          ? `Use ${community.title} to share useful finds and help other builders keep going.`
-          : `Use ${community.title} to ask quick questions and find your people faster.`;
-      setFlash(promptMessage, "success");
+      if (!isCommunityJoined(community.key)) {
+        setFlash(`Join the ${community.title} community to post there.`, "error");
+        render();
+        return;
+      }
+
+      appState.communityComposer = {
+        communityKey: community.key,
+        promptType,
+      };
+      render();
+      return;
+    }
+
+    if (action === "close-community-composer") {
+      appState.communityComposer = { communityKey: null, promptType: "ask" };
       render();
       return;
     }
@@ -493,6 +505,12 @@
     if (form.matches("#join-request-form")) {
       event.preventDefault();
       createJoinRequest(new FormData(form));
+      return;
+    }
+
+    if (form.matches("#community-post-form")) {
+      event.preventDefault();
+      createCommunityPost(new FormData(form));
     }
   });
 
@@ -1365,7 +1383,7 @@
         projectUrl: "",
         coverImage: "",
         status: "open",
-        isDemoProject: false,
+        isDemoProject: true,
         teamSizeMode: "fixed",
         teamSizeValue: 3,
         durationType: "fixed",
@@ -1384,7 +1402,7 @@
         projectUrl: "",
         coverImage: "",
         status: "active",
-        isDemoProject: false,
+        isDemoProject: true,
         teamSizeMode: "fixed",
         teamSizeValue: 3,
         durationType: "fixed",
@@ -1657,8 +1675,8 @@
         changed = true;
       }
 
-      if (["Open Studio Poster Set", "Pixel Dungeon Build Tracker"].includes(project.title) && project.isDemoProject) {
-        project.isDemoProject = false;
+      if (["Open Studio Poster Set", "Pixel Dungeon Build Tracker"].includes(project.title) && !project.isDemoProject) {
+        project.isDemoProject = true;
         changed = true;
       }
 
@@ -1816,6 +1834,64 @@
     }
 
     render();
+  }
+
+  async function createCommunityPost(formData) {
+    const user = currentUser();
+    if (!user) {
+      setFlash("Create an account or log in before posting in a community.", "error");
+      render();
+      return;
+    }
+
+    const communityKey = String(formData.get("communityKey") || "");
+    const promptType = String(formData.get("promptType") || "ask");
+    const content = String(formData.get("content") || "").trim();
+    const community = communityConfigFor(communityKey);
+
+    if (!isCommunityJoined(community.key, user)) {
+      setFlash(`Join the ${community.title} community to post there.`, "error");
+      render();
+      return;
+    }
+
+    if (!content) {
+      setFlash(promptType === "resource" ? "Add a resource to share first." : "Write your question first.", "error");
+      render();
+      return;
+    }
+
+    try {
+      if (supabase) {
+        const { error } = await supabase.from("community_posts").insert({
+          community_key: community.key,
+          author_id: user.id,
+          content,
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        await refreshRemoteData();
+      } else {
+        appState.db.communityPosts.unshift({
+          id: createId("community-post"),
+          communityKey: community.key,
+          authorId: user.id,
+          content,
+          createdAt: new Date().toISOString(),
+        });
+        persistDatabase();
+      }
+
+      appState.communityComposer = { communityKey: null, promptType: "ask" };
+      setFlash(promptType === "resource" ? "Resource shared." : "Question posted.", "success");
+      render();
+    } catch (error) {
+      setFlash(error.message || `We couldn't post in ${community.title} right now.`, "error");
+      render();
+    }
   }
 
   async function handleSignup(formData) {
@@ -3894,6 +3970,18 @@
     const joined = isCommunityJoined(community.key);
     const featuredProject = featuredCommunityProject(community.key);
     const posts = communityPostsForKey(community.key);
+    const composerOpen = appState.communityComposer.communityKey === community.key;
+    const composerType = composerOpen ? appState.communityComposer.promptType : "ask";
+    const composerTitle = composerType === "resource" ? "Share a resource" : "Ask a question";
+    const composerCopy =
+      composerType === "resource"
+        ? "Share a useful tool, link, or reference that can help other builders keep going."
+        : "Ask something quick and invite the right people to jump in with help.";
+    const composerPlaceholder =
+      composerType === "resource"
+        ? "Share a useful link, tool, or note with the community..."
+        : "What are you stuck on, exploring, or trying to learn?";
+    const composerButton = composerType === "resource" ? "Share resource" : "Post question";
 
     return `
       <main class="stack community-page">
@@ -3956,6 +4044,29 @@
               <p>Short posts, quick progress notes, and useful finds people are sharing right now.</p>
             </div>
           </div>
+          ${
+            joined && composerOpen
+              ? `
+                <form id="community-post-form" class="community-composer">
+                  <input type="hidden" name="communityKey" value="${community.key}" />
+                  <input type="hidden" name="promptType" value="${composerType}" />
+                  <div class="row-between">
+                    <div>
+                      <strong>${composerTitle}</strong>
+                      <p class="small">${composerCopy}</p>
+                    </div>
+                    <button class="ghost-btn" type="button" data-action="close-community-composer">Cancel</button>
+                  </div>
+                  <div class="field">
+                    <textarea name="content" placeholder="${escapeHtml(composerPlaceholder)}" required></textarea>
+                  </div>
+                  <div class="inline-actions">
+                    <button class="primary-btn" type="submit">${composerButton}</button>
+                  </div>
+                </form>
+              `
+              : ""
+          }
           <div class="community-feed-list">
             ${posts
               .map(
