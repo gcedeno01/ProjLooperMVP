@@ -272,6 +272,10 @@ a {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.layout.info-route-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .browse-layout main.stack > .panel {
   display: flex;
   flex-direction: column;
