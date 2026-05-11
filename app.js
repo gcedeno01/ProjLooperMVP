@@ -1641,6 +1641,9 @@
     const seededDemoChatSnippets = new Set([
       "I dropped the first shot list in the project updates. Anyone want to help with titles?",
       "Starting with contributors who love web nostalgia and textured digital collage.",
+      "Dropped the first tracker pass. If anyone wants to shape the issue labels, jump in.",
+      "I can help with the playtest summary layout tomorrow.",
+      "Shared a first pass of the repair categories. Happy to tighten the language next.",
     ]);
 
     if (!Array.isArray(appState.db.projectChats)) {
@@ -4679,7 +4682,7 @@
             <textarea id="feedback-notes" placeholder="What feels clear, confusing, promising, or missing?"></textarea>
           </div>
           <div class="inline-actions">
-            <a class="primary-btn footer-link-btn" href="mailto:cedeno.gianni@gmail.com?subject=Project%20Looper%20Feedback">Send feedback by email</a>
+          <a class="primary-btn footer-link-btn" href="mailto:projectlooper01@gmail.com?subject=Project%20Looper%20Feedback">Send feedback by email</a>
           </div>
         </section>
       </main>
